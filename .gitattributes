@@ -1,0 +1,4 @@
+* text=auto
+*.bat -text
+*.ps1 -text
+*.ico binary

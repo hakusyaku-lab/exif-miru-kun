@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E📷%3C/text%3E%3C/svg%3E">
+<title>写真のExif見る君</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* レイアウト：上にドロップ帯、下に写真ごとのカード（左サムネ・右に情報）を縦に積む */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --fg: #1d2724;
+  --muted: #5f6d68;
+  --line: #d9e0dd;
+  --accent: #0f7a63;
+  --accent-soft: #e2f1ec;
+  --warn: #9a5b00;
+  --warn-soft: #fbefd9;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Consolas", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121816; --surface: #1a2220; --fg: #e4ebe8; --muted: #9aa8a3; --line: #2c3834;
+    --accent: #4cc5a4; --accent-soft: #173229; --warn: #f0b45a; --warn-soft: #3a2b12; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121816; --surface: #1a2220; --fg: #e4ebe8; --muted: #9aa8a3; --line: #2c3834;
+  --accent: #4cc5a4; --accent-soft: #173229; --warn: #f0b45a; --warn-soft: #3a2b12; color-scheme: dark;
+}
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1 { font-size: 1.6rem; margin: 0; text-wrap: balance; letter-spacing: .02em; }
+.lead { margin: 4px 0 0; color: var(--muted); }
+.drop {
+  border: 2px dashed var(--line); border-radius: 14px; background: var(--surface);
+  padding: 28px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center;
+  transition: border-color .15s, background .15s;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop p { margin: 0; color: var(--muted); }
+.btn {
+  font: inherit; font-weight: 700; cursor: pointer; border-radius: 8px; padding: 10px 20px;
+  background: var(--accent); color: var(--surface); border: 0;
+}
+.btn.sub { background: transparent; color: var(--accent); border: 1px solid var(--line); font-weight: 500; padding: 6px 12px; font-size: .9rem; }
+.btn:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.note { font-size: .85rem; color: var(--muted); }
+.bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.bar .count { color: var(--muted); font-size: .9rem; }
+.list { display: flex; flex-direction: column; gap: 16px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+  display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px;
+}
+@media (max-width: 560px) { .card { grid-template-columns: minmax(0, 1fr); } }
+.thumb {
+  width: 100%; max-width: 100%; aspect-ratio: 1; border-radius: 8px; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--muted); font-size: .8rem;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.info { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.name { font-weight: 700; word-break: break-all; }
+.pill { font-size: .78rem; font-weight: 700; padding: 2px 10px; border-radius: 99px; white-space: nowrap; }
+.pill.gps { background: var(--accent-soft); color: var(--accent); }
+.pill.nogps { background: var(--warn-soft); color: var(--warn); }
+.pill.sample { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+dl { margin: 0; display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 4px 12px; }
+dt { color: var(--muted); font-size: .88rem; }
+dd { margin: 0; word-break: break-word; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: .92rem; }
+.geo { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.geo .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.geo a { color: var(--accent); font-weight: 700; }
+.nogeo { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: .9rem; }
+details summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
+.all { overflow-x: auto; margin-top: 8px; max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.all table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+.all td { padding: 4px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.all td:first-child { color: var(--muted); white-space: nowrap; }
+.all td:last-child { font-family: var(--font-mono); word-break: break-all; }
+.err { color: var(--warn); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>写真のExif見る君</h1>
+    <p class="lead">写真を入れると、撮影日時・カメラ機種・撮影場所（位置情報）を表示します。見るだけで、写真は変更しません。</p>
+  </header>
+
+  <label class="drop" id="drop" for="file">
+    <strong>ここに写真をドラッグ＆ドロップ</strong>
+    <p>JPEG・HEIC（iPhone）・PNG・WebP・TIFF に対応。何枚でもまとめて入れられます。</p>
+    <span class="btn" role="button">写真を選ぶ</span>
+    <input type="file" id="file" accept="image/*,.heic,.heif" multiple hidden>
+    <span class="note">写真はこのページの中だけで読み取ります。どこにも送信されません。</span>
+  </label>
+
+  <div class="bar">
+    <span class="count" id="count">下は見本です。写真を入れると置き換わります。</span>
+    <button class="btn sub" id="clear" type="button" hidden>一覧をクリア</button>
+  </div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<script src="exifr.umd.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const list = $('#list'), countEl = $('#count'), clearBtn = $('#clear');
+let hasReal = false, total = 0, withGps = 0;
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad = n => String(n).padStart(2, '0');
+
+function fmtDate(d) {
+  if (!d) return null;
+  if (!(d instanceof Date)) return String(d);
+  if (isNaN(d)) return null;
+  const w = '日月火水木金土'[d.getDay()];
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${w}） ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function toDMS(v, pos, neg) {
+  const a = Math.abs(v), d = Math.floor(a), mf = (a - d) * 60, m = Math.floor(mf), s = (mf - m) * 60;
+  return `${v >= 0 ? pos : neg} ${d}°${m}′${s.toFixed(1)}″`;
+}
+function fmtShutter(t) {
+  if (!t) return null;
+  return t >= 1 ? `${t}秒` : `1/${Math.round(1 / t)}秒`;
+}
+function fmtSize(b) {
+  return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+}
+function fmtVal(v) {
+  if (v instanceof Date) return fmtDate(v);
+  if (v instanceof Uint8Array || ArrayBuffer.isView(v)) return `（データ ${v.length} バイト）`;
+  if (Array.isArray(v)) return v.length > 12 ? `（${v.length} 個の値）` : v.join(', ');
+  if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+  return String(v);
+}
+
+function render(o) {
+  const card = document.createElement('article');
+  card.className = 'card';
+  const rows = [];
+  const add = (k, v) => { if (v !== null && v !== undefined && v !== '') rows.push(`<dt>${k}</dt><dd>${v}</dd>`); };
+  add('撮影日時', o.date ? esc(o.date) : '<span class="err">記録なし</span>');
+  add('機種', o.camera ? esc(o.camera) : null);
+  add('レンズ', o.lens ? esc(o.lens) : null);
+  add('撮影設定', o.settings ? `<span class="mono">${esc(o.settings)}</span>` : null);
+  add('画像サイズ', o.dims ? `<span class="mono">${esc(o.dims)}</span>` : null);
+  add('ファイル', `<span class="mono">${esc(o.fileSize)}</span>`);
+  add('ソフト', o.software ? esc(o.software) : null);
+
+  let geo;
+  if (o.lat != null && o.lon != null) {
+    const dec = `${o.lat.toFixed(6)}, ${o.lon.toFixed(6)}`;
+    const q = encodeURIComponent(`${o.lat},${o.lon}`);
+    geo = `<div class="geo">
+      <div class="row"><span class="mono">${dec}</span><button class="btn sub copy" type="button" data-copy="${dec}">コピー</button></div>
+      <div class="mono" style="color:var(--muted)">${toDMS(o.lat,'北緯','南緯')} / ${toDMS(o.lon,'東経','西経')}${o.alt != null ? ` / 高度 ${Math.round(o.alt)}m` : ''}</div>
+      <div class="row">
+        <a href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">Googleマップで開く ↗</a>
+        <a href="https://maps.gsi.go.jp/#17/${o.lat}/${o.lon}/" target="_blank" rel="noopener">地理院地図 ↗</a>
+      </div>
+    </div>`;
+  } else {
+    geo = `<div class="nogeo">位置情報は入っていません（撮影時にオフだった、またはSNS等で削除済み）</div>`;
+  }
+
+  const pill = o.sample ? '<span class="pill sample">見本</span>' :
+    (o.lat != null ? '<span class="pill gps">位置情報あり</span>' : '<span class="pill nogps">位置情報なし</span>');
+
+  const all = o.raw && Object.keys(o.raw).length ? `<details><summary>すべての項目を見る（${Object.keys(o.raw).length}項目）</summary>
+    <div class="all"><table>${Object.entries(o.raw).map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(fmtVal(v))}</td></tr>`).join('')}</table></div></details>` : '';
+
+  card.innerHTML = `
+    <div class="thumb">${o.thumb ? `<img alt="" src="${o.thumb}">` : 'プレビューなし'}</div>
+    <div class="info">
+      <div class="head"><span class="name">${esc(o.name)}</span>${pill}</div>
+      ${o.error ? `<div class="nogeo">${esc(o.error)}</div>` : `<dl>${rows.join('')}</dl>${geo}${all}`}
+    </div>`;
+  return card;
+}
+
+async function readFile(file) {
+  const o = { name: file.name, fileSize: fmtSize(file.size) };
+  let raw = null;
+  try {
+    raw = await exifr.parse(file, { tiff: true, exif: true, gps: true, xmp: true, icc: false, iptc: true, mergeOutput: true, translateValues: true, reviveValues: true });
+  } catch (e) { raw = null; }
+  let gps = null;
+  try { gps = await exifr.gps(file); } catch (e) {}
+
+  // サムネイル
+  const isBrowserImg = /^image\/(jpeg|png|webp|gif|bmp|avif)$/.test(file.type);
+  if (isBrowserImg) o.thumb = URL.createObjectURL(file);
+  else { try { o.thumb = await exifr.thumbnailUrl(file); } catch (e) {} }
+
+  if (!raw && !gps) {
+    o.error = 'Exif情報が見つかりませんでした（スクリーンショット・SNSから保存した画像・加工済み画像によくあります）';
+    return o;
+  }
+  raw = raw || {};
+  o.raw = raw;
+  o.date = fmtDate(raw.DateTimeOriginal || raw.CreateDate || raw.ModifyDate);
+  const make = (raw.Make || '').trim(), model = (raw.Model || '').trim();
+  o.camera = model.toLowerCase().startsWith(make.toLowerCase()) ? model : [make, model].filter(Boolean).join(' ');
+  o.lens = raw.LensModel || raw.LensMake || null;
+  const s = [];
+  if (raw.FNumber) s.push(`F${raw.FNumber}`);
+  if (raw.ExposureTime) s.push(fmtShutter(raw.ExposureTime));
+  if (raw.ISO) s.push(`ISO${raw.ISO}`);
+  if (raw.FocalLength) s.push(`${Math.round(raw.FocalLength)}mm`);
+  o.settings = s.join('  ');
+  const w = raw.ExifImageWidth || raw.ImageWidth, h = raw.ExifImageHeight || raw.ImageHeight;
+  if (w && h) o.dims = `${w} × ${h}`;
+  o.software = raw.Software || null;
+  if (gps && isFinite(gps.latitude) && isFinite(gps.longitude) && !(gps.latitude === 0 && gps.longitude === 0)) {
+    o.lat = gps.latitude; o.lon = gps.longitude;
+    if (raw.GPSAltitude != null) o.alt = raw.GPSAltitude * (raw.GPSAltitudeRef === 1 ? -1 : 1);
+  }
+  return o;
+}
+
+async function handle(files) {
+  files = [...files].filter(f => f.type.startsWith('image/') || /\.(heic|heif|tif|tiff|jpe?g|png|webp|dng)$/i.test(f.name));
+  if (!files.length) return;
+  if (!hasReal) { list.innerHTML = ''; hasReal = true; total = 0; withGps = 0; }
+  clearBtn.hidden = false;
+  for (const f of files) {
+    const o = await readFile(f);
+    total++; if (o.lat != null) withGps++;
+    list.appendChild(render(o));
+    countEl.textContent = `${total}枚を読み取りました（位置情報あり ${withGps}枚）`;
+  }
+}
+
+// 見本
+list.appendChild(render({
+  sample: true, name: 'IMG_0412.HEIC（見本）', fileSize: '2.4 MB',
+  date: '2026年10月18日（土） 14:32:07', camera: 'iPhone 15 Pro', lens: 'iPhone 15 Pro back triple camera 6.86mm f/1.78',
+  settings: 'F1.8  1/250秒  ISO64  24mm', dims: '4032 × 3024', software: '18.6',
+  lat: 35.003500, lon: 135.920700, alt: 92
+}));
+
+const drop = $('#drop');
+$('#file').addEventListener('change', e => { handle(e.target.files); e.target.value = ''; });
+['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => handle(e.dataTransfer.files));
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); if (!drop.contains(e.target)) handle(e.dataTransfer.files); });
+
+clearBtn.addEventListener('click', () => {
+  list.innerHTML = ''; total = 0; withGps = 0; clearBtn.hidden = true;
+  countEl.textContent = '写真を入れてください。';
+});
+
+list.addEventListener('click', async e => {
+  const b = e.target.closest('.copy'); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'コピーしました'; }
+  catch (err) {
+    const r = document.createRange(); r.selectNodeContents(b.previousElementSibling);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = '選択しました';
+  }
+  setTimeout(() => b.textContent = 'コピー', 1500);
+});
+</script>
+</body>
+</html>

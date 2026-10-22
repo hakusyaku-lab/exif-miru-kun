@@ -32,6 +32,7 @@
   --accent: #4cc5a4; --accent-soft: #173229; --warn: #f0b45a; --warn-soft: #3a2b12; color-scheme: dark;
 }
 html { background: var(--bg); }
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
@@ -91,6 +92,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
 .all td:first-child { color: var(--muted); white-space: nowrap; }
 .all td:last-child { font-family: var(--font-mono); word-break: break-all; }
 .err { color: var(--warn); }
+.mode { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: .82rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 99px; padding: 3px 12px; }
+.mode::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -100,6 +103,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
   <header>
     <h1>写真のExif見る君</h1>
     <p class="lead">写真を入れると、撮影日時・カメラ機種・撮影場所（位置情報）を表示します。見るだけで、写真は変更しません。</p>
+    <span class="mode" id="mode" hidden>オフラインで動作中（このPCのファイルから開いています）</span>
   </header>
 
   <label class="drop" id="drop" for="file">
@@ -121,6 +125,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
 <script src="exifr.umd.js"></script>
 <script>
 const $ = s => document.querySelector(s);
+if (location.protocol === 'file:') $('#mode').hidden = false;
 const list = $('#list'), countEl = $('#count'), clearBtn = $('#clear');
 let hasReal = false, total = 0, withGps = 0;
 

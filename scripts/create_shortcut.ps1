@@ -1,5 +1,5 @@
 ﻿# デスクトップとスタートメニューに「写真のExif見る君」のショートカットを作る
-# Chrome があれば Chrome の専用ウィンドウ（アドレスバーなし）で開く。なければ既定のブラウザで開く
+# Chrome か Edge の「アプリ用ウィンドウ」（タブ・アドレスバーなし）で開く。ネットは使わない
 param([Parameter(Mandatory=$true)][string]$AppDir)
 
 $page  = Join-Path $AppDir 'index.html'
@@ -24,8 +24,26 @@ if (-not $chrome) {
     }
 }
 
-if ($chrome) { Write-Host "  Chrome で開くように設定します: $chrome" }
-else         { Write-Host "  Chrome が見つからないため、既定のブラウザで開くように設定します" }
+# Chrome がなければ Edge（Windows 11 に標準で入っている）を使う
+$browser = $chrome
+if (-not $browser) {
+    foreach ($key in @(
+        'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe',
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe')) {
+        try { $v = (Get-ItemProperty -Path $key -ErrorAction Stop).'(default)'; if ($v -and (Test-Path $v)) { $browser = $v; break } } catch {}
+    }
+}
+if (-not $browser) {
+    foreach ($p in @(
+        (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
+        (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'))) {
+        if ($p -and (Test-Path $p)) { $browser = $p; break }
+    }
+}
+
+if ($browser) { Write-Host "  専用ウィンドウで開くように設定します: $browser" }
+else          { Write-Host "  Chrome も Edge も見つからないため、既定のブラウザで開くように設定します" }
 
 $places = @(
     [Environment]::GetFolderPath('Desktop'),
@@ -35,8 +53,8 @@ foreach ($dir in $places) {
     if (-not $dir) { continue }
     $lnk = Join-Path $dir '写真のExif見る君.lnk'
     $s = $shell.CreateShortcut($lnk)
-    if ($chrome) {
-        $s.TargetPath = $chrome
+    if ($browser) {
+        $s.TargetPath = $browser
         $s.Arguments  = '--app="' + $url + '" --window-size=1000,900'
     } else {
         $s.TargetPath = $page
